@@ -1,0 +1,925 @@
+<!DOCTYPE html>
+<meta charset="utf-8">
+<style>
+
+.background {
+  fill: none;
+  pointer-events: all;
+}
+
+#states {
+  fill: #bbbbbb;
+}
+
+#states .active {
+  fill: #ff0000;
+  fill-opacity: .5;
+}
+
+#state-borders {
+  fill: none;
+  stroke: #bbbbbb;
+  stroke-width: 2px;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+  pointer-events: none;
+}
+
+path.link {
+  fill: none;
+  stroke: #666666;
+  stroke-width: 1.5px;
+}
+
+.stroke {
+  fill: none;
+  stroke: #000;
+  stroke-width: 3px;
+}
+
+
+</style>
+<body>
+    <h2>
+      <span>NASA Cloud Regions and Center Connections</span>
+    </h2>
+
+<script src="d3.v3.min.js"></script>
+<script src="d3.geo.projection.v0.min.js"></script>
+<script src="topojson.v1.min.js"></script>
+<script>
+
+var width = 1200,
+    height = 620,
+    centered;
+
+var projection = d3.geo.albersUsa()
+    .scale(1100);
+
+var path = d3.geo.path()
+    .projection(projection);
+
+var svg = d3.select("body").append("svg")
+    .attr("width", width)
+    .attr("height", height);
+
+var g = svg.append("g")
+	
+g.append("rect")
+    .attr("class", "background")
+    .attr("width", width)
+    .attr("height", height);
+
+var stateGroup = g.append('g');
+var arcGroup = g.append('g');
+var cloudGroup = g.append('g');
+var imageGroup = g.append('g');
+
+var eastLoc = {
+    EastCloud: [-78.5, 39.1]
+};
+
+var eastcloud = cloudGroup.append("g")
+    .attr("class", "points")
+  .selectAll("g")
+    .data(d3.entries(eastLoc))
+  .enter().append("g")
+    .attr("transform", function(d) { return "translate(" + projection(d.value) + ")"; });
+ 
+eastcloud.append("ellipse")
+    .attr("rx", 110)
+	.attr("ry", 80)
+	.attr("fill", "#222244")
+	.attr("opacity", 0.15)
+	.on("click", clickedEast);
+	
+eastcloud.append("text")
+	.attr("y", 0)
+	.attr("x", 115)
+	.text(function(d) { return d.key; });
+
+var westLoc = {
+    WestCloud: [-119.6, 35.7]
+};
+
+var westcloud = cloudGroup.append("g")
+    .attr("class", "points")
+  .selectAll("g")
+    .data(d3.entries(westLoc))
+  .enter().append("g")
+    .attr("transform", function(d) { return "translate(" + projection(d.value) + ")"; });
+ 
+westcloud.append("ellipse")
+    .attr("rx", 100)
+	.attr("ry", 120)
+	.attr("fill", "#222244")
+	.attr("opacity", 0.15)
+	.on("click", clickedWest);
+	
+westcloud.append("text")
+	.attr("y", -75)
+	.attr("x", 80)
+	.text(function(d) { return d.key; });
+
+var southLoc = {
+	SouthCloud: [-88.0, 30.7]
+};
+	
+var southcloud = cloudGroup.append("g")
+    .attr("class", "points")
+  .selectAll("g")
+    .data(d3.entries(southLoc))
+  .enter().append("g")
+    .attr("transform", function(d) { return "translate(" + projection(d.value) + ")"; });
+ 
+southcloud.append("ellipse")
+    .attr("rx", 180)
+	.attr("ry", 110)
+	.attr("fill", "#222244")
+	.attr("opacity", 0.15)
+	.on("click", clickedSouth);
+	
+southcloud.append("text")
+	.attr("y", 0)
+	.attr("x", 185)
+	.text(function(d) { return d.key; });
+	
+d3.json("us.json", function(error, us) {
+    stateGroup.append("g")
+      .attr("id", "states")
+	  .attr("opacity", 1)
+    .selectAll("path")
+      .data(topojson.feature(us, us.objects.states).features)
+    .enter().append("path")
+      .attr("d", path)
+      .on("click", clickedNASA);
+
+    stateGroup.append("path")
+      .datum(topojson.mesh(us, us.objects.states, function(a, b) { return a !== b; }))
+      .attr("id", "state-borders")
+      .attr("d", path);
+	  
+	d3.csv("nasacloud.csv", function(error, data) {
+			
+        var lineTransition = function lineTransition(path) {
+            path.transition()
+				.duration(7500)
+                .attrTween("stroke-dasharray", tweenDash)
+                .each("end", function(d,i) { 
+                });
+        };
+        var tweenDash = function tweenDash() {
+
+            var len = this.getTotalLength(),
+                interpolate = d3.interpolateString("0," + len, len + "," + len);
+
+            return function(t) { return interpolate(t); };
+        };
+
+        var links = [];
+        for(var i=-1, len=data.length-1; i<len; i++){
+
+            links.push({
+                type: "LineString",
+                coordinates: [
+                    [ data[0].lon, data[0].lat ],
+                    [ data[i+1].lon, data[i+1].lat ]
+                ]
+            });
+			links.push({
+                type: "LineString",
+                coordinates: [
+                    [ data[1].lon, data[1].lat ],
+                    [ data[i+1].lon, data[i+1].lat ]
+                ]
+            });
+			
+			links.push({
+                type: "LineString",
+                coordinates: [
+                    [ data[2].lon, data[2].lat ],
+                    [ data[i+1].lon, data[i+1].lat ]
+                ]
+            });
+        }
+
+        var pathArcs = arcGroup.selectAll(".arc")
+            .data(links);
+
+        pathArcs.enter()
+            .append("path").attr({
+                'class': 'arc'
+            }).style({ 
+                fill: 'none',
+            });
+
+        pathArcs.attr({
+                d: path
+            })
+            .style({
+                stroke: '#000077',
+                'stroke-width': '10px',
+				'stroke-linejoin': 'round',
+				'stroke-linecap': 'round',
+				'stroke-opacity': .20
+            })
+            .call(lineTransition);
+
+    });
+	
+});
+
+function clickedNASA(d) {
+	
+	d3.csv("nasacenters.csv", function(error, data) {
+		imageGroup.selectAll("image").data([0])
+           .data(data)
+           .enter()
+           .append("image")
+            .attr("xlink:href", "nasalogo.png")
+            .attr("width", "30")
+            .attr("height", "30")
+            .attr("x", function(d) {
+                   return projection([d.lon, d.lat])[0]-15;
+            })
+            .attr("y", function(d) {
+                   return projection([d.lon, d.lat])[1]-15;
+            })
+		   .append("title")
+			.text(function(d) { return d.center })
+			
+        var lineTransition = function lineTransition(path) {
+            path.transition()
+				.duration(7500)
+                .attrTween("stroke-dasharray", tweenDash)
+                .each("end", function(d,i) { 
+                });
+        };
+        var tweenDash = function tweenDash() {
+
+            var len = this.getTotalLength(),
+                interpolate = d3.interpolateString("0," + len, len + "," + len);
+
+            return function(t) { return interpolate(t); };
+        };
+
+        var links = [];
+        for(var i=-1, len=data.length-1; i<len; i++){
+
+            links.push({
+                type: "LineString",
+                coordinates: [
+                    [ data[0].lon, data[0].lat ],
+                    [ data[i+1].lon, data[i+1].lat ]
+                ]
+            });
+			links.push({
+                type: "LineString",
+                coordinates: [
+                    [ data[1].lon, data[1].lat ],
+                    [ data[i+1].lon, data[i+1].lat ]
+                ]
+            });
+			
+			links.push({
+                type: "LineString",
+                coordinates: [
+                    [ data[2].lon, data[2].lat ],
+                    [ data[i+1].lon, data[i+1].lat ]
+                ]
+            });
+			
+			links.push({
+                type: "LineString",
+                coordinates: [
+                    [ data[3].lon, data[3].lat ],
+                    [ data[i+1].lon, data[i+1].lat ]
+                ]
+            });
+			
+			links.push({
+                type: "LineString",
+                coordinates: [
+                    [ data[4].lon, data[4].lat ],
+                    [ data[i+1].lon, data[i+1].lat ]
+                ]
+            });
+			
+			links.push({
+                type: "LineString",
+                coordinates: [
+                    [ data[5].lon, data[5].lat ],
+                    [ data[i+1].lon, data[i+1].lat ]
+                ]
+            });
+			
+			links.push({
+                type: "LineString",
+                coordinates: [
+                    [ data[6].lon, data[6].lat ],
+                    [ data[i+1].lon, data[i+1].lat ]
+                ]
+            });
+			
+			links.push({
+                type: "LineString",
+                coordinates: [
+                    [ data[7].lon, data[7].lat ],
+                    [ data[i+1].lon, data[i+1].lat ]
+                ]
+            });
+			
+			links.push({
+                type: "LineString",
+                coordinates: [
+                    [ data[8].lon, data[8].lat ],
+                    [ data[i+1].lon, data[i+1].lat ]
+                ]
+            });
+			
+			links.push({
+                type: "LineString",
+                coordinates: [
+                    [ data[9].lon, data[9].lat ],
+                    [ data[i+1].lon, data[i+1].lat ]
+                ]
+            });
+			links.push({
+                type: "LineString",
+                coordinates: [
+                    [ data[10].lon, data[10].lat ],
+                    [ data[i+1].lon, data[i+1].lat ]
+                ]
+            });
+        }
+
+        var pathArcs = arcGroup.selectAll(".arc")
+            .data(links);
+
+        pathArcs.enter()
+            .append("path").attr({
+                'class': 'arc'
+            }).style({ 
+                fill: 'none',
+            });
+
+        pathArcs.attr({
+                d: path
+            })
+            .style({
+                stroke: '#ff0000',
+                'stroke-width': '2px',
+				'stroke-opacity': .40
+            })
+            .call(lineTransition); 
+
+        pathArcs.exit().remove();
+
+    });
+	
+	d3.csv("nasacloud.csv", function(error, data) {
+			
+        var lineTransition = function lineTransition(path) {
+            path.transition()
+				.duration(7500)
+                .attrTween("stroke-dasharray", tweenDash)
+                .each("end", function(d,i) { 
+                });
+        };
+        var tweenDash = function tweenDash() {
+
+            var len = this.getTotalLength(),
+                interpolate = d3.interpolateString("0," + len, len + "," + len);
+
+            return function(t) { return interpolate(t); };
+        };
+
+        var links = [];
+        for(var i=-1, len=data.length-1; i<len; i++){
+
+            links.push({
+                type: "LineString",
+                coordinates: [
+                    [ data[0].lon, data[0].lat ],
+                    [ data[i+1].lon, data[i+1].lat ]
+                ]
+            });
+			links.push({
+                type: "LineString",
+                coordinates: [
+                    [ data[1].lon, data[1].lat ],
+                    [ data[i+1].lon, data[i+1].lat ]
+                ]
+            });
+			
+			links.push({
+                type: "LineString",
+                coordinates: [
+                    [ data[2].lon, data[2].lat ],
+                    [ data[i+1].lon, data[i+1].lat ]
+                ]
+            });
+        }
+
+        var pathArcs = arcGroup.selectAll(".arc")
+            .data(links);
+
+        pathArcs.enter()
+            .append("path").attr({
+                'class': 'arc'
+            }).style({ 
+                fill: 'none',
+            });
+
+        pathArcs.attr({
+                d: path
+            })
+            .style({
+                stroke: '#000077',
+                'stroke-width': '10px',
+				'stroke-linejoin': 'round',
+				'stroke-linecap': 'round',
+				'stroke-opacity': .20
+            })
+            .call(lineTransition);
+
+    });
+	
+}
+
+function clickedWest(d) {
+
+	d3.csv("nasawest.csv", function(error, data) {
+		imageGroup.selectAll("image").data([0])
+           .data(data)
+           .enter()
+           .append("image")
+            .attr("xlink:href", "nasalogo.png")
+            .attr("width", "30")
+            .attr("height", "30")
+            .attr("x", function(d) {
+                   return projection([d.lon, d.lat])[0]-15;
+            })
+            .attr("y", function(d) {
+                   return projection([d.lon, d.lat])[1]-15;
+            })
+		   .append("title")
+			.text(function(d) { return d.center })
+			
+        var lineTransition = function lineTransition(path) {
+            path.transition()
+				.duration(5000)
+                .attrTween("stroke-dasharray", tweenDash)
+                .each("end", function(d,i) { 
+                });
+        };
+        var tweenDash = function tweenDash() {
+
+            var len = this.getTotalLength(),
+                interpolate = d3.interpolateString("0," + len, len + "," + len);
+
+            return function(t) { return interpolate(t); };
+        };
+
+        var links = [];
+        for(var i=-1, len=data.length-1; i<len; i++){
+
+            links.push({
+                type: "LineString",
+                coordinates: [
+                    [ data[0].lon, data[0].lat ],
+                    [ data[i+1].lon, data[i+1].lat ]
+                ]
+            });
+			links.push({
+                type: "LineString",
+                coordinates: [
+                    [ data[1].lon, data[1].lat ],
+                    [ data[i+1].lon, data[i+1].lat ]
+                ]
+            });
+			
+			links.push({
+                type: "LineString",
+                coordinates: [
+                    [ data[2].lon, data[2].lat ],
+                    [ data[i+1].lon, data[i+1].lat ]
+                ]
+            });
+			
+			links.push({
+                type: "LineString",
+                coordinates: [
+                    [ data[3].lon, data[3].lat ],
+                    [ data[i+1].lon, data[i+1].lat ]
+                ]
+            });
+        }
+
+        var pathArcs = arcGroup.selectAll(".arc")
+            .data(links);
+
+        pathArcs.enter()
+            .append("path").attr({
+                'class': 'arc'
+            }).style({ 
+                fill: 'none',
+            });
+
+        pathArcs.attr({
+                d: path
+            })
+            .style({
+                stroke: '#ff0000',
+                'stroke-width': '2px',
+				'stroke-opacity': .40
+            })
+            .call(lineTransition); 
+
+        pathArcs.exit().remove();
+
+    });
+	
+	d3.csv("nasacloud.csv", function(error, data) {
+			
+        var lineTransition = function lineTransition(path) {
+            path.transition()
+				.duration(7500)
+                .attrTween("stroke-dasharray", tweenDash)
+                .each("end", function(d,i) { 
+                });
+        };
+        var tweenDash = function tweenDash() {
+
+            var len = this.getTotalLength(),
+                interpolate = d3.interpolateString("0," + len, len + "," + len);
+
+            return function(t) { return interpolate(t); };
+        };
+
+        var links = [
+            {
+                type: "LineString",
+                    coordinates: [
+                        [ data[0].lon, data[0].lat ],
+                        [ data[1].lon, data[1].lat ]
+                    ]
+            },
+			{
+                type: "LineString",
+                    coordinates: [
+                        [ data[0].lon, data[0].lat ],
+                        [ data[2].lon, data[2].lat ]
+                    ]
+            }
+        ];
+
+        var pathArcs = arcGroup.selectAll(".arc")
+            .data(links);
+
+        pathArcs.enter()
+            .append("path").attr({
+                'class': 'arc'
+            }).style({ 
+                fill: 'none',
+            });
+
+        pathArcs.attr({
+                d: path
+            })
+            .style({
+                stroke: '#000077',
+                'stroke-width': '10px',
+				'stroke-linejoin': 'round',
+				'stroke-linecap': 'round',
+				'stroke-opacity': .20
+            })
+            .call(lineTransition);
+
+    });
+	
+}
+
+function clickedEast(d) {
+	
+	d3.csv("nasaeast.csv", function(error, data) {
+		imageGroup.selectAll("image").data([0])
+           .data(data)
+           .enter()
+           .append("image")
+            .attr("xlink:href", "nasalogo.png")
+            .attr("width", "30")
+            .attr("height", "30")
+            .attr("x", function(d) {
+                   return projection([d.lon, d.lat])[0]-15;
+            })
+            .attr("y", function(d) {
+                   return projection([d.lon, d.lat])[1]-15;
+            })
+		   .append("title")
+			.text(function(d) { return d.center })
+			
+        var lineTransition = function lineTransition(path) {
+            path.transition()
+				.duration(5000)
+                .attrTween("stroke-dasharray", tweenDash)
+                .each("end", function(d,i) { 
+                });
+        };
+        var tweenDash = function tweenDash() {
+
+            var len = this.getTotalLength(),
+                interpolate = d3.interpolateString("0," + len, len + "," + len);
+
+            return function(t) { return interpolate(t); };
+        };
+
+        var links = [];
+        for(var i=-1, len=data.length-1; i<len; i++){
+
+            links.push({
+                type: "LineString",
+                coordinates: [
+                    [ data[0].lon, data[0].lat ],
+                    [ data[i+1].lon, data[i+1].lat ]
+                ]
+            });
+			links.push({
+                type: "LineString",
+                coordinates: [
+                    [ data[1].lon, data[1].lat ],
+                    [ data[i+1].lon, data[i+1].lat ]
+                ]
+            });
+			
+			links.push({
+                type: "LineString",
+                coordinates: [
+                    [ data[2].lon, data[2].lat ],
+                    [ data[i+1].lon, data[i+1].lat ]
+                ]
+            });
+			
+			links.push({
+                type: "LineString",
+                coordinates: [
+                    [ data[3].lon, data[3].lat ],
+                    [ data[i+1].lon, data[i+1].lat ]
+                ]
+            });
+			
+			links.push({
+                type: "LineString",
+                coordinates: [
+                    [ data[4].lon, data[4].lat ],
+                    [ data[i+1].lon, data[i+1].lat ]
+                ]
+            });
+        }
+
+        var pathArcs = arcGroup.selectAll(".arc")
+            .data(links);
+
+        pathArcs.enter()
+            .append("path").attr({
+                'class': 'arc'
+            }).style({ 
+                fill: 'none',
+            });
+
+        pathArcs.attr({
+                d: path
+            })
+            .style({
+                stroke: '#ff0000',
+                'stroke-width': '2px',
+				'stroke-opacity': .40
+            })
+            .call(lineTransition); 
+
+        pathArcs.exit().remove();
+
+    });
+	
+	d3.csv("nasacloud.csv", function(error, data) {
+			
+        var lineTransition = function lineTransition(path) {
+            path.transition()
+				.duration(7500)
+                .attrTween("stroke-dasharray", tweenDash)
+                .each("end", function(d,i) { 
+                });
+        };
+        var tweenDash = function tweenDash() {
+
+            var len = this.getTotalLength(),
+                interpolate = d3.interpolateString("0," + len, len + "," + len);
+
+            return function(t) { return interpolate(t); };
+        };
+
+        var links = [
+            {
+                type: "LineString",
+                    coordinates: [
+                        [ data[1].lon, data[1].lat ],
+                        [ data[0].lon, data[0].lat ]
+                    ]
+            },
+			{
+                type: "LineString",
+                    coordinates: [
+                        [ data[1].lon, data[1].lat ],
+                        [ data[2].lon, data[2].lat ]
+                    ]
+            }
+        ];
+
+        var pathArcs = arcGroup.selectAll(".arc")
+            .data(links);
+
+        pathArcs.enter()
+            .append("path").attr({
+                'class': 'arc'
+            }).style({ 
+                fill: 'none',
+            });
+
+        pathArcs.attr({
+                d: path
+            })
+            .style({
+                stroke: '#000077',
+                'stroke-width': '10px',
+				'stroke-linejoin': 'round',
+				'stroke-linecap': 'round',
+				'stroke-opacity': .20
+            })
+            .call(lineTransition);
+
+    });
+
+}
+
+function clickedSouth(d) {
+
+	d3.csv("nasasouth.csv", function(error, data) {
+		imageGroup.selectAll("image").data([0])
+           .data(data)
+           .enter()
+           .append("image")
+            .attr("xlink:href", "nasalogo.png")
+            .attr("width", "30")
+            .attr("height", "30")
+            .attr("x", function(d) {
+                   return projection([d.lon, d.lat])[0]-15;
+            })
+            .attr("y", function(d) {
+                   return projection([d.lon, d.lat])[1]-15;
+            })
+		   .append("title")
+			.text(function(d) { return d.center })
+					
+        var lineTransition = function lineTransition(path) {
+            path.transition()
+				.duration(5000)
+                .attrTween("stroke-dasharray", tweenDash)
+                .each("end", function(d,i) { 
+                });
+        };
+        var tweenDash = function tweenDash() {
+
+            var len = this.getTotalLength(),
+                interpolate = d3.interpolateString("0," + len, len + "," + len);
+
+            return function(t) { return interpolate(t); };
+        };
+
+        var links = [];
+        for(var i=-1, len=data.length-1; i<len; i++){
+
+            links.push({
+                type: "LineString",
+                coordinates: [
+                    [ data[0].lon, data[0].lat ],
+                    [ data[i+1].lon, data[i+1].lat ]
+                ]
+            });
+			links.push({
+                type: "LineString",
+                coordinates: [
+                    [ data[1].lon, data[1].lat ],
+                    [ data[i+1].lon, data[i+1].lat ]
+                ]
+            });
+			
+			links.push({
+                type: "LineString",
+                coordinates: [
+                    [ data[2].lon, data[2].lat ],
+                    [ data[i+1].lon, data[i+1].lat ]
+                ]
+            });
+			
+			links.push({
+                type: "LineString",
+                coordinates: [
+                    [ data[3].lon, data[3].lat ],
+                    [ data[i+1].lon, data[i+1].lat ]
+                ]
+            });
+			
+			links.push({
+                type: "LineString",
+                coordinates: [
+                    [ data[4].lon, data[4].lat ],
+                    [ data[i+1].lon, data[i+1].lat ]
+                ]
+            });
+        }
+
+        var pathArcs = arcGroup.selectAll(".arc")
+            .data(links);
+
+        pathArcs.enter()
+            .append("path").attr({
+                'class': 'arc'
+            }).style({ 
+                fill: 'none',
+            });
+
+        pathArcs.attr({
+                d: path
+            })
+            .style({
+                stroke: '#ff0000',
+                'stroke-width': '2px',
+				'stroke-opacity': .40
+            })
+            .call(lineTransition); 
+
+        pathArcs.exit().remove();
+    });
+	
+	d3.csv("nasacloud.csv", function(error, data) {
+			
+        var lineTransition = function lineTransition(path) {
+            path.transition()
+				.duration(7500)
+                .attrTween("stroke-dasharray", tweenDash)
+                .each("end", function(d,i) { 
+                });
+        };
+        var tweenDash = function tweenDash() {
+
+            var len = this.getTotalLength(),
+                interpolate = d3.interpolateString("0," + len, len + "," + len);
+
+            return function(t) { return interpolate(t); };
+        };
+
+        var links = [
+            {
+                type: "LineString",
+                    coordinates: [
+                        [ data[2].lon, data[2].lat ],
+                        [ data[0].lon, data[0].lat ]
+                    ]
+            },
+			{
+                type: "LineString",
+                    coordinates: [
+                        [ data[2].lon, data[2].lat ],
+                        [ data[1].lon, data[1].lat ]
+                    ]
+            }
+        ];
+
+        var pathArcs = arcGroup.selectAll(".arc")
+            .data(links);
+
+        pathArcs.enter()
+            .append("path").attr({
+                'class': 'arc'
+            }).style({ 
+                fill: 'none',
+            });
+
+        pathArcs.attr({
+                d: path
+            })
+            .style({
+                stroke: '#000077',
+                'stroke-width': '10px',
+				'stroke-linejoin': 'round',
+				'stroke-linecap': 'round',
+				'stroke-opacity': .20
+            })
+            .call(lineTransition);
+
+    });
+
+}
+    </script>
+  </body>
+</html>
